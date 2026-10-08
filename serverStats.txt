@@ -1,0 +1,3 @@
+What are limitations of your HTTP server?
+
+The initial implementation assumes the request headers arrive within a single recv(). Since TCP is a byte stream and doesn't preserve application-level message boundaries, a production implementation would maintain a receive buffer and continue reading until the HTTP headers are complete, and for requests with bodies, use Content-Length or another framing mechanism.

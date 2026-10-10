@@ -8,13 +8,14 @@
 
 using namespace std;
 
+
 struct HttpRequest{
     string method;
     string path;
     string version;
-
+    
     unordered_map<string, string> headers;
-
+    
     string body;
 };
 
@@ -22,24 +23,24 @@ struct HttpResponse{
     int statusCode;
     string statusText;
     string contentType;
-
+    
     string body;
 };
 
 HttpResponse createResponse(int statusCode, string statusText, string body){
     HttpResponse response;
-
+    
     response.statusCode = statusCode;
     response.statusText = statusText;
     response.contentType = "text/plain";
     response.body = body;
-
+    
     return response;
 }
 
 string serializeResponse(const HttpResponse& response){
     string result;
-
+    
     result += "HTTP/1.1 ";
     result += to_string(response.statusCode);
     result += " ";
@@ -49,13 +50,13 @@ string serializeResponse(const HttpResponse& response){
     result += "Content-Type: ";
     result += response.contentType;
     result += "\r\n";
-
+    
     result += "Content-Length: ";
     result += to_string(response.body.size());
     result += "\r\n";
-
+    
     result += "\r\n";
-
+    
     result += response.body;
 
     return result;
@@ -65,7 +66,7 @@ HttpRequest parseRequest(const string& rawRequest){ //we write const becoz it co
     HttpRequest request;
 
     istringstream stream(rawRequest);
-
+    
     //first we will extract the request line
     string requestLine;
     getline(stream, requestLine);  //to split by anything else we can use getline(stream, requestLine, ',')
@@ -73,12 +74,12 @@ HttpRequest parseRequest(const string& rawRequest){ //we write const becoz it co
     if(!requestLine.empty() && requestLine.back() == '\r'){
         requestLine.pop_back();
     }
-
+    
     //adding the request line parameters to HttpRequest struct
     istringstream requestLineStream(requestLine);
 
     requestLineStream >> request.method >> request.path >> request.version;
-
+    
     //start reading headers
     string line;
 
@@ -95,14 +96,14 @@ HttpRequest parseRequest(const string& rawRequest){ //we write const becoz it co
 
         //find colon ":"
         size_t colon = line.find(':');
-
+        
         if(colon == string::npos){
             continue;
         }
 
         string key = line.substr(0, colon);
         string value = line.substr(colon+1);
-
+        
         //we are removing any leading space. Ex - Host: localhost:8080, the leading space after colon
         if(!value.empty() && value[0] == ' '){
             value.erase(0, 1);
@@ -110,13 +111,13 @@ HttpRequest parseRequest(const string& rawRequest){ //we write const becoz it co
 
         request.headers[key] = value;
     }
-
+    
     //got empty line means next line body starts
     string bodyLine;
 
     while(getline(stream, bodyLine)){
         request.body += bodyLine;
-
+        
         if(!stream.eof()){
             request.body += '\n';
         }
@@ -125,10 +126,47 @@ HttpRequest parseRequest(const string& rawRequest){ //we write const becoz it co
     return request;
 }
 
+//using Handler = HttpResponse (*)(const HttpRequest&); //we can also use function pointers -> will not support capturing lambdas, but is blazing fast(direct jump to CPU)
+using Handler = function<HttpResponse(const HttpRequest&)>;
+
+class Router{
+    private:
+        unordered_map<string, Handler> routes;
+
+    public:
+        void addRoute(const string& method,const string& path, Handler handler){
+            string key = method + " " + path;
+
+            routes[key] = handler;
+        }
+
+        HttpResponse route(const HttpRequest& request){
+            string key = request.method + " " + request.path;
+
+            auto it = routes.find(key);
+
+            if(it == routes.end()){
+                return createResponse(404, "Not Found", "Route not found");
+            }
+
+            return it->second(request);
+        }
+};
+
+HttpResponse homeHandler(const HttpRequest& request){
+    return createResponse(200, "OK", "Welcome to HTTP Server!");
+}
+HttpResponse healthHandler(const HttpRequest& request){
+    return createResponse(200, "OK", "Server is healthy :)");
+}
+HttpResponse aboutHandler(const HttpRequest& request){
+    return createResponse(200, "OK", "This is an c++ backend engineering of server.");
+}
+
 int main(){
     //Initializing winsock
     WSADATA wsaData;
-
+    
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
     if(result != 0){
@@ -184,6 +222,12 @@ int main(){
 
     cout << "Server listening on port 8080...\n";
 
+    Router router;
+
+    router.addRoute("GET", "/", homeHandler);
+    router.addRoute("GET", "/health", healthHandler);
+    router.addRoute("GET", "/about", aboutHandler);
+
     while(true){
 
         cout << "Waiting For client..." << endl;
@@ -217,20 +261,7 @@ int main(){
 
             HttpRequest request = parseRequest(rawRequest);
 
-            HttpResponse response;
-
-            if(request.method == "GET" && request.path == "/"){
-                response = createResponse(200, "OK", "Welcome to HTTP Server!");
-            }
-            else if(request.method == "GET" && request.path == "/health"){
-                response = createResponse(200, "OK", "Server is healthy :)");
-            }
-            else if(request.method == "GET" && request.path == "/about"){
-                response = createResponse(200, "OK", "This is an c++ backend engineering of server.");
-            }
-            else{
-                response = createResponse(404, "NOT FOUND", "Route not found");
-            }
+            HttpResponse response = router.route(request);
 
             string responseText = serializeResponse(response);
 

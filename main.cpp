@@ -27,6 +27,25 @@ struct HttpResponse{
     string body;
 };
 
+struct User{
+    int id;
+    string name;
+};
+
+vector<User> users;
+int nextUserId = 1;
+
+HttpResponse createJsonResponse(int statusCode, string statusText, string body){
+    HttpResponse response;
+
+    response.statusCode = statusCode;
+    response.statusText = statusText;
+    response.contentType = "application/json";
+    response.body = body;
+
+    return response;
+}
+
 HttpResponse createResponse(int statusCode, string statusText, string body){
     HttpResponse response;
     
@@ -126,6 +145,31 @@ HttpRequest parseRequest(const string& rawRequest){ //we write const becoz it co
     return request;
 }
 
+string escapeJson(const string& value){
+    string result;
+
+    for(char ch : value){
+        if(ch == '\\' || ch == '"'){
+            result += "\\";
+        }
+
+        if(ch == '\n'){
+            result += "\\n";
+        }
+        else if(ch == '\r'){
+            result += "\\r";
+        }
+        else if(ch == '\t'){
+            result += "\\t";
+        }
+        else{
+            result += ch;
+        }
+    }
+
+    return result;
+}
+
 //using Handler = HttpResponse (*)(const HttpRequest&); //we can also use function pointers -> will not support capturing lambdas, but is blazing fast(direct jump to CPU)
 using Handler = function<HttpResponse(const HttpRequest&)>;
 
@@ -161,6 +205,44 @@ HttpResponse healthHandler(const HttpRequest& request){
 }
 HttpResponse aboutHandler(const HttpRequest& request){
     return createResponse(200, "OK", "This is an c++ backend engineering of server.");
+}
+
+//making this initially where in request we are only sending name -> --data-binary "Ishan"
+HttpResponse createUserHandler(const HttpRequest& request){
+    string name = request.body;
+
+    int start = name.find_first_not_of(" \t\r\n");
+    int end  = name.find_last_not_of(" \t\r\n");
+
+    if(start == string::npos){
+        return createResponse(400, "Bad Request", "Name is required");
+    }
+
+    name = name.substr(start, end-start+1);
+
+    User user{nextUserId++, name};
+    users.push_back(user);
+
+    string body = "{\"id\":" + to_string(user.id) + ",\"name\":\"" + escapeJson(user.name) + "\"}";
+
+    return createJsonResponse(201, "Created", body);
+}
+
+HttpResponse getUserHandler(const HttpRequest& request){
+    string body = "[";
+
+    for(int i = 0; i<users.size(); i++){
+        if(i > 0){
+            body += ",";
+        }
+
+        body += "{\"id\":" + to_string(users[i].id);
+        body += ",\"name\":\"" + escapeJson(users[i].name) + "\"}";
+    }
+
+    body += "]";
+
+    return createJsonResponse(200, "OK", body);
 }
 
 int main(){
@@ -227,6 +309,9 @@ int main(){
     router.addRoute("GET", "/", homeHandler);
     router.addRoute("GET", "/health", healthHandler);
     router.addRoute("GET", "/about", aboutHandler);
+
+    router.addRoute("GET", "/users", getUserHandler);
+    router.addRoute("POST", "/users", createUserHandler);
 
     while(true){
 

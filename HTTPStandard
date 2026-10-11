@@ -1,0 +1,26 @@
+HTTP Standard -> The Request and The Response
+
+You reverse-engineered the foundational blueprint of the modern internet. What you are building in your C++ code follows the strict layout of HTTP (Hypertext Transfer Protocol).
+Here is the story of who built this, why it looks the way it does, and why the entire world agreed to use it.
+
+1. Who built this standard?
+
+The HTTP protocol was originally created by Tim Berners-Lee in 1989–1991 while he was working as a scientist at CERN (the European Organization for Nuclear Research).
+He didn't just invent HTTP; he simultaneously invented the World Wide Web (WWW), HTML (the language to write webpages), and the very first web browser.
+Later, to prevent any single company from owning the internet, the official formatting rules were formalized into documentation called RFCs (Request for Comments) by the IETF (Internet Engineering Task Force) and the W3C (World Wide Web Consortium), which still maintain these standards today.
+
+2. Why was it created this way? (The Design Philosophy)
+
+Tim Berners-Lee needed a way for researchers around the globe to easily share documentation, research papers, and data stored on different operating systems. He designed the protocol with three brilliant requirements:
+• Human-Readable & Text-Based: He made it plain text so that engineers could easily read, write, debug, and type out a raw request by hand if needed.
+• Stateless: The server doesn't have to remember your past actions. You send a standalone request (Method + Path), and the server immediately gives you a standalone response (Status + Body). This keeps servers fast and simple.
+• Extensible via Headers: By adding the HEADERS section, he ensured the protocol could evolve. Without changing the core layout, headers allowed future engineers to add security controls, cookies, login sessions, and support for rendering different formats (like JSON or images).
+
+3. Why does every browser and server use this standard?
+
+The short answer is Universal Interoperability.
+Imagine a world where Google Chrome used one language format, Apple's Safari used another, a Python backend used a third, and your C++ server used a fourth. No one would be able to communicate.
+Because HTTP was made an open, royalty-free standard, it acted as a universal bridge.
+• For Browsers (Chrome, Safari, Edge): They know exactly how to parse the incoming text streams. They read the status code (200 OK or 404 Not Found), check the Content-Type header to see if it's text, an image, or JSON, and render it properly for the user.
+• For Servers (Nginx, Apache, or your C++ App): They know exactly what indices to split strings on (like finding the space between METHOD and PATH, or looking for the double \r\n\r\n marker) because the browser is guaranteed to send it in that exact layout.
+When you type http://localhost:8080/health into Google Chrome, Chrome constructs the text packet using the exact method, path, and version fields you mapped out, pushes it over a raw TCP socket, and waits for your C++ program to send back that structured response block. You are quite literally speaking the native language of the internet!
